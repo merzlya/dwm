@@ -56,6 +56,7 @@
 #define HEIGHT(X)               ((X)->h + 2 * (X)->bw)
 #define TAGMASK                 ((1 << LENGTH(tags)) - 1)
 #define TEXTW(X)                (drw_text(drw, 0, 0, 0, 0, (X), 0) + drw->fonts[0]->h)
+#define TAGCOUNT                9
 
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
@@ -129,7 +130,7 @@ struct Monitor {
 	Client *stack;
 	Monitor *next;
 	Window barwin;
-	const Layout *lt[2];
+	const Layout *lt[TAGCOUNT+1];
 };
 
 typedef struct {
@@ -233,6 +234,7 @@ static int xerror(Display *dpy, XErrorEvent *ee);
 static int xerrordummy(Display *dpy, XErrorEvent *ee);
 static int xerrorstart(Display *dpy, XErrorEvent *ee);
 static void zoom(const Arg *arg);
+static unsigned int gettag(Monitor *m);
 
 /* variables */
 static const char broken[] = "broken";
@@ -537,6 +539,7 @@ clientmessage(XEvent *e)
 		if (!ISVISIBLE(c)) {
 			c->mon->seltags ^= 1;
 			c->mon->tagset[c->mon->seltags] = c->tags;
+			c->mon->sellt = gettag(c->mon);
 		}
 		pop(c);
 	}
@@ -645,6 +648,7 @@ Monitor *
 createmon(void)
 {
 	Monitor *m;
+	unsigned int i;
 
 	m = ecalloc(1, sizeof(Monitor));
 	m->tagset[0] = m->tagset[1] = 1;
@@ -652,8 +656,8 @@ createmon(void)
 	m->nmaster = nmaster;
 	m->showbar = showbar;
 	m->topbar = topbar;
-	m->lt[0] = &layouts[0];
-	m->lt[1] = &layouts[1 % LENGTH(layouts)];
+	for(i = 0; i <= TAGCOUNT; ++i)
+		m->lt[i] = &layouts[0];
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
 	return m;
 }
@@ -1522,10 +1526,12 @@ setfullscreen(Client *c, int fullscreen)
 void
 setlayout(const Arg *arg)
 {
-	if (!arg || !arg->v || arg->v != selmon->lt[selmon->sellt])
-		selmon->sellt ^= 1;
-	if (arg && arg->v)
-		selmon->lt[selmon->sellt] = (Layout *)arg->v;
+	if (!arg || !arg->v)
+		return;
+	selmon->sellt=gettag(selmon);
+	if(arg->v == selmon->lt[selmon->sellt])
+		return;
+	selmon->lt[selmon->sellt] = (Layout *)arg->v;
 	strncpy(selmon->ltsymbol, selmon->lt[selmon->sellt]->symbol, sizeof selmon->ltsymbol);
 	if (selmon->sel)
 		arrange(selmon);
@@ -1739,6 +1745,7 @@ toggleview(const Arg *arg)
 
 	if (newtagset) {
 		selmon->tagset[selmon->seltags] = newtagset;
+		selmon->sellt = gettag(selmon);
 		focus(NULL);
 		arrange(selmon);
 	}
@@ -2041,6 +2048,7 @@ view(const Arg *arg)
 	selmon->seltags ^= 1; /* toggle sel tagset */
 	if (arg->ui & TAGMASK)
 		selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
+	selmon->sellt = gettag(selmon);
 	focus(NULL);
 	arrange(selmon);
 }
@@ -2123,6 +2131,16 @@ zoom(const Arg *arg)
 		if (!c || !(c = nexttiled(c->next)))
 			return;
 	pop(c);
+}
+
+static unsigned int gettag(Monitor *m)
+{
+	const unsigned int tagbit = m->tagset[m->seltags];
+	unsigned int i;
+	for(i = 0; i < TAGCOUNT; ++i)
+		if(tagbit == (1 << i))
+			return i+1;
+	return 0;
 }
 
 int
