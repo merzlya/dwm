@@ -171,6 +171,7 @@ static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusmon(const Arg *arg);
 static void focusstack(const Arg *arg);
+static void focusstack2(const Arg *arg);
 static int getrootptr(int *x, int *y);
 static long getstate(Window w);
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
@@ -870,6 +871,29 @@ focusstack(const Arg *arg)
 			for (; i; i = i->next)
 				if (ISVISIBLE(i))
 					c = i;
+	}
+	if (c) {
+		focus(c);
+		restack(selmon);
+	}
+}
+
+void
+focusstack2(const Arg *arg)
+{
+	Client *c = NULL, *i;
+	unsigned int p, n = 0;
+
+	if (arg->i >= 0) {
+		for (i = selmon->clients; i; i = i->next)
+			if(ISVISIBLE(i) && !(n++))
+				c = i;
+		if(!n) return;
+		i = c;
+		n = n-arg->i%n;
+		for(p = 1; p < n; ++p)
+			for (c = c->next; c && !ISVISIBLE(c); c = c->next);
+		if (!c) c = i;
 	}
 	if (c) {
 		focus(c);
