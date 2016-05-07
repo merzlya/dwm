@@ -66,7 +66,7 @@ enum { NetSupported, NetWMName, NetWMState,
        NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
 enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
-       ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
+       ClkClientWin, ClkRootWin, ClkLast, ClkClientBar }; /* clicks */
 
 typedef union {
 	int i;
@@ -241,8 +241,8 @@ static unsigned int gettag(Monitor *m);
 static const char broken[] = "broken";
 static char stext[256];
 static int screen;
-static int sw, sh;           /* X display screen geometry width, height */
-static int bh, blw = 0;      /* bar geometry */
+static int sw, sh;               /* X display screen geometry width, height */
+static int bh, blw = 0, clw = 0; /* bar geometry */
 static int (*xerrorxlib)(Display *, XErrorEvent *);
 static unsigned int numlockmask = 0;
 static void (*handler[LASTEvent]) (XEvent *) = {
@@ -441,7 +441,17 @@ buttonpress(XEvent *e)
 			arg.ui = 1 << i;
 		} else if (ev->x < x + blw)
 			click = ClkLtSymbol;
-		else if (ev->x > selmon->ww - TEXTW(stext))
+		else if (ev->x < x + blw + clw) {
+			click = ClkClientBar;
+			i = 0;
+			x += blw;
+			char buf[64];
+			do {
+				snprintf(buf,64,"%d",++i);
+				x += TEXTW(buf);
+			} while (ev->x > x);
+			arg.i = --i;
+		} else if (ev->x > selmon->ww - TEXTW(stext))
 			click = ClkStatusText;
 		else
 			click = ClkWinTitle;
@@ -452,7 +462,7 @@ buttonpress(XEvent *e)
 	for (i = 0; i < LENGTH(buttons); i++)
 		if (click == buttons[i].click && buttons[i].func && buttons[i].button == ev->button
 		&& CLEANMASK(buttons[i].mask) == CLEANMASK(ev->state))
-			buttons[i].func(click == ClkTagBar && buttons[i].arg.i == 0 ? &arg : &buttons[i].arg);
+			buttons[i].func((click == ClkTagBar && buttons[i].arg.i == 0) || click == ClkClientBar ? &arg : &buttons[i].arg);
 }
 
 void
@@ -715,8 +725,9 @@ void
 drawbar(Monitor *m)
 {
 	int x, xx, w, dx;
-	unsigned int i, occ = 0, urg = 0;
+	unsigned int i, occ = 0, urg = 0, n = 0, f = 0;
 	Client *c;
+	char buf[64];
 
 	dx = (drw->fonts[0]->ascent + drw->fonts[0]->descent + 2) / 4;
 
@@ -738,6 +749,25 @@ drawbar(Monitor *m)
 	drw_setscheme(drw, &scheme[SchemeNorm]);
 	drw_text(drw, x, 0, w, bh, m->ltsymbol, 0);
 	x += w;
+	for (c = m->clients; c; c = c->next)
+		if(ISVISIBLE(c)) {
+			if (c == m->sel)
+				f = n;
+			++n;
+		}
+	clw = x;
+	for (i = 1; i <= n; ++i) {
+		snprintf(buf,64,"%d",i);
+		w = TEXTW(buf);
+		drw_setscheme(drw, i == n-f ? &scheme[SchemeSel] : &scheme[SchemeNorm]);
+		drw_text(drw, x, 0, w, bh, buf, 0);
+		x += w;
+	}
+	clw = x - clw;
+	w = TEXTW("");
+	drw_setscheme(drw, &scheme[SchemeNorm]);
+	drw_text(drw, x, 0, w, bh, "", 0);
+	x += w;
 	xx = x;
 	if (m == selmon) { /* status is only drawn on selected monitor */
 		w = TEXTW(stext);
@@ -746,6 +776,7 @@ drawbar(Monitor *m)
 			x = xx;
 			w = m->ww - xx;
 		}
+		drw_setscheme(drw, &scheme[SchemeNorm]);
 		drw_text(drw, x, 0, w, bh, stext, 0);
 	} else
 		x = m->ww;
