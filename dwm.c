@@ -404,8 +404,14 @@ arrangemon(Monitor *m)
 void
 attach(Client *c)
 {
-	c->next = c->mon->clients;
-	c->mon->clients = c;
+	if(c->mon->clients) {
+		Client *tc;
+		for (tc = c->mon->clients;tc->next; tc = tc->next);
+		tc->next = c;
+	} else {
+		c->mon->clients = c;
+	}
+	c->next = NULL;
 }
 
 void
@@ -725,7 +731,7 @@ void
 drawbar(Monitor *m)
 {
 	int x, xx, w, dx;
-	unsigned int i, occ = 0, urg = 0, n = 0, f = 0;
+	unsigned int i, occ = 0, urg = 0, n = 0;
 	Client *c;
 	char buf[64];
 
@@ -749,19 +755,15 @@ drawbar(Monitor *m)
 	drw_setscheme(drw, &scheme[SchemeNorm]);
 	drw_text(drw, x, 0, w, bh, m->ltsymbol, 0);
 	x += w;
-	for (c = m->clients; c; c = c->next)
-		if(ISVISIBLE(c)) {
-			if (c == m->sel)
-				f = n;
-			++n;
-		}
 	clw = x;
-	for (i = 1; i <= n; ++i) {
-		snprintf(buf,64,"%d",i);
-		w = TEXTW(buf);
-		drw_setscheme(drw, i == n-f ? &scheme[SchemeSel] : &scheme[SchemeNorm]);
-		drw_text(drw, x, 0, w, bh, buf, 0);
-		x += w;
+	for (c = m->clients; c; c = c->next) {
+		if(ISVISIBLE(c)) {
+			snprintf(buf,64,"%d",++n);
+			w = TEXTW(buf);
+			drw_setscheme(drw, c == m->sel ? &scheme[SchemeSel] : &scheme[SchemeNorm]);
+			drw_text(drw, x, 0, w, bh, buf, c->isurgent);
+			x += w;
+		}
 	}
 	clw = x - clw;
 	w = TEXTW("");
@@ -890,7 +892,7 @@ focusstack(const Arg *arg)
 
 	if (!selmon->sel)
 		return;
-	if (arg->i > 0) {
+	if (arg->i <= 0) {
 		for (c = selmon->sel->next; c && !ISVISIBLE(c); c = c->next);
 		if (!c)
 			for (c = selmon->clients; c && !ISVISIBLE(c); c = c->next);
@@ -913,18 +915,12 @@ void
 focusstack2(const Arg *arg)
 {
 	Client *c = NULL, *i;
-	unsigned int p, n = 0;
+	unsigned int n = 0;
 
 	if (arg->i >= 0) {
 		for (i = selmon->clients; i; i = i->next)
-			if(ISVISIBLE(i) && !(n++))
+			if(ISVISIBLE(i) && arg->i == n++)
 				c = i;
-		if(!n) return;
-		i = c;
-		n = n-arg->i%n;
-		for(p = 1; p < n; ++p)
-			for (c = c->next; c && !ISVISIBLE(c); c = c->next);
-		if (!c) c = i;
 	}
 	if (c) {
 		focus(c);
