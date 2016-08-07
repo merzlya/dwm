@@ -104,6 +104,7 @@ static Key keys[] = {
 	{ MODKEY,                       XK_F10,    focusstack2,    {.i = 9 } },
 	{ MODKEY,                       XK_F11,    focusstack2,    {.i = 10 } },
 	{ MODKEY,                       XK_F12,    focusstack2,    {.i = 11 } },
+	{ MODKEY|ShiftMask,             XK_m,      maximize,       {0} },
 };
 
 /* button definitions */

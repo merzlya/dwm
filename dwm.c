@@ -215,6 +215,7 @@ static void togglebar(const Arg *arg);
 static void togglefloating(const Arg *arg);
 static void toggletag(const Arg *arg);
 static void toggleview(const Arg *arg);
+static void maximize(const Arg *arg);
 static void unfocus(Client *c, int setfocus);
 static void unmanage(Client *c, int destroyed);
 static void unmapnotify(XEvent *e);
@@ -1800,6 +1801,13 @@ toggleview(const Arg *arg)
 		focus(NULL);
 		arrange(selmon);
 	}
+}
+
+void
+maximize(const Arg *arg)
+{
+	if (selmon->sel && (selmon->sel->isfloating || !selmon->lt[selmon->sellt]->arrange))
+		resize(selmon->sel, selmon->wx, selmon->wy, selmon->ww - 2 * selmon->sel->bw, selmon->wh - 2 * selmon->sel->bw, 0);
 }
 
 void
